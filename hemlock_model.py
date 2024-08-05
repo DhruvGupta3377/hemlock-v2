@@ -15,15 +15,15 @@ import numpy as np
 import pickle
 
 
-with open("/kaggle/input/tensors/og_data_4.pkl", "rb") as file:
+with open("og_data_4.pkl", "rb") as file:
     og_data = pickle.load(file)
 
-with open("/kaggle/input/tensors/sty_data_4.pkl", "rb") as file:
+with open("sty_data_4.pkl", "rb") as file:
     sty_data = pickle.load(file)
 
-original_train = og_data[2:396]
+original_train = og_data[366:396]
 original_test = og_data[0:2]
-stylized_train = sty_data[2:396]
+stylized_train = sty_data[366:396]
 stylized_test = sty_data[0:2]
 
 def compute_scores(emb_one, emb_two, dim=2):
@@ -34,7 +34,7 @@ def cloaking(original, styled, similarity_scores):
     cloaked = original.clone()
     for i in range(1,similarity_scores.shape[0]):
         for j in range(1,similarity_scores.shape[1]):
-            if similarity_scores[i][j] > 0.17 and similarity_scores[i][j] < 0.29:
+            if similarity_scores[i][j] > 0.13 and similarity_scores[i][j] < 0.32:
                 cloaked[0][i][j] = styled[0][i][j]
     return cloaked
 
@@ -169,7 +169,7 @@ lpips_loss = lpips.LPIPS(net='vgg')
 def loss_fun(cloaked, original):
     lpips_val = lpips_loss(cloaked, original)
     psnr_val = psnr_loss(cloaked, original)
-    net_loss = 0.65*lpips_val + 0.35*psnr_val
+    net_loss = 0.7*lpips_val + 0.3*psnr_val
     return net_loss
 
 def load_checkpoint(filepath):
@@ -183,7 +183,7 @@ def load_checkpoint(filepath):
     
     return model
 
-model = load_checkpoint('/kaggle/input/hemlock/pytorch/v4/1/checkpoint_LPIPS_PSNR_4.pth')
+model = UNet()
 optimizer = optim.Adam(model.parameters(), lr=5e-4, weight_decay=1e-5)
 
 print(torch.cuda.get_device_name(0))
@@ -196,7 +196,7 @@ original_test = [tensor.to(device) for tensor in original_test]
 stylized_train = [tensor.to(device) for tensor in stylized_train]
 stylized_test = [tensor.to(device) for tensor in stylized_test]
 
-num_epochs = 20
+num_epochs = 1
 for epoch in range(num_epochs):
     model.train()
     running_loss = 0.0
@@ -208,7 +208,8 @@ for epoch in range(num_epochs):
         # Backward pass
         loss.backward()
         optimizer.step()
-#         print("Done",i)
+        if i%20 ==0:
+            print("Done",i) 
         running_loss += loss.item()
 
     epoch_loss = running_loss / len(original_train)
@@ -218,8 +219,7 @@ checkpoint = {'model': UNet(),
               'state_dict': model.state_dict(),
               'optimizer' : optimizer.state_dict()}
 
-torch.save(checkpoint, 'checkpoint_LPIPS_PSNR_5.pth')
-
+torch.save(checkpoint, 'checkpoint_LPIPS_PSNR.pth')
 
 
 
@@ -256,9 +256,9 @@ input_img = original_test[0]
 input_img = torch.squeeze(input_img)
 input_img = ImgTransform(input_img)
 
-display(input_img)
-display(sty_img)
-display(output_img)
+# display(input_img)
+# display(sty_img)
+# display(output_img)
 
 from matplotlib import pyplot as plt 
   
@@ -295,8 +295,8 @@ plt.title("Cloaked")
 input_img.save('original.png')
 output_img.save('cloaked.png')
 
-img1 = Image.open('/kaggle/working/original.png').convert('RGB')
-img2 = Image.open('/kaggle/working/cloaked.png').convert('RGB')
+img1 = Image.open('original.png').convert('RGB')
+img2 = Image.open('cloaked.png').convert('RGB')
 img2 = img2.resize(img1.size)
 
 img1_tensor = torch.tensor(np.array(img1)).permute(2,0,1).unsqueeze(0).float() / 127.5 - 1
